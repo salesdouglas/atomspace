@@ -1,0 +1,542 @@
+
+Sheafs and Network Inference
+============================
+This directory provides two sets of tools. One set, the "sheaves",
+provides a simple and easy API for working with graphs. The second
+toolset extracts graphical relationships from linear data, via an MST
+parser.
+
+Sheafs - Quick Start
+====================
+Sheafs provide a simple and convenient mechanism for working with
+graphs "locally", by making the nearest-neighbors of a vertex apparent.
+
+The traditional textbook-canonical way of specifying a graph is to
+state that it is a set of vertexes, and a set of edges that connect
+pairs of vertexes.  The problem with this description is that given
+any vertex, one has no idea of what edges are connected to it, without
+scanning the entire set of edges. Another problem is that vertexes and
+edges are not composable; that is, when they are composed together,
+they are no longer vertexes or edges, but a more general type: a
+"subgraph".  By contrast, sheaves carry local information, and are
+composable.
+
+Given a vertex V, a "section" is defined as a set of pairs (V,E) of
+that vertex V and all edges E that are attached to it.  That's it!
+Very simple!  A section can be envisioned as a "spider", with the
+vertex V as the body of the spider, and the edges as the legs of the
+spider.
+
+Sections are composable, in that several can be connected together
+by joining ("connecting") edges.  The result is still a section, in
+that it has a central blob as the spider-body, and a whole bunch of
+legs sticking out. Composing sections in such a way that the edges
+connect only in legal ways is called "parsing".
+
+Another way of visualizing sections is to envision a jigsaw-puzzle
+piece instead of a spider. The vertex V is a label on the puzzle-piece,
+and each leg is a tab or slot on the puzzle-piece. The tabs or slots
+are now obviously connectors: this emphasizes that jigsaw-puzzle pieces
+can be connected together legally only when the connectors fit together.
+Again: the act of fitting together puzzle-pieces in a legal fashion is
+termed "parsing".
+
+In standard mathematical terminology, the spider-body or jigsaw-label
+is called the "germ". It is meant to evoke the idea of a germinating
+seed, as will become clear below.
+
+Diagramatic illustrations of jig-saw puzzle-pieces can be found here:
+
+* Sleator, Temperley, [Parsing English with a Link Grammar](http://www.cs.cmu.edu/afs/cs.cmu.edu/project/link/pub/www/papers/ps/tr91-196.pdf)
+* Bob Coeke, [New Scientist: Quantum Links Let Computers Read](http://www.cs.ox.ac.uk/people/bob.coecke/NewScientist.pdf)
+
+A more formal technique for visualizing connected edges in a monoidal or
+tensor category is the [string diagram](https://ncatlab.org/nlab/show/string+diagram).
+
+
+Sections in Atomese
+-------------------
+Sections are represented in Atomese as follows:
+```
+     Section
+         Atom "foo" ; usually a Node of some kind.
+         ConnectorSeq
+             Connector
+                 Atom "bar"      ; for example, a WordNode.
+                 LabelAtom "foo-to-bar label" ; can be a PredicateNode.
+             Connector
+                ....
+```
+Here, `(Atom "foo")` is the spider-body or germ. Each leg of the spider
+is represented by a `Connector` link. In the above example, the vertex
+"foo" has an edge "foo-bar" attached to it, with `(Atom "bar")` being
+the far-endpoint of that edge. The edge carries an optional label,
+shown as `LabelAtom`, above.
+
+The "foo-bar" edge can also be represented as an `EvaluationLink`,
+which is the structure used in many other parts of OpenCog.
+```
+       EvaluationLink
+           LabelAtom "foo-to-bar label" ; can be a PredicateNode.
+           ListLink
+               Atom "foo"
+               Atom "bar"
+```
+This `EvaluationLink`, and the `Section...Connector` structure are meant
+to be sort-of, more-or-less equivalent and interchangeable. (In many
+cases, thy can be taken to be equivalent; however, the `Section...
+Connector` structure is more general and can describe more kinds of
+structures more simply than an EvaluationLink can.  This will be made
+clear below).
+
+Connectors
+----------
+Note that `Connector`s are like "half-edges": in isolation, they carry
+the edge-label, and the far endpoint, but not the near endpoint.  The
+term "connector" is used to emphasize that these are meant to behave
+like the tabs on a jigsaw-puzzle piece: that they serve to connect to
+other connectors on other sections.
+
+There are no explicit or implicit rules for how to connect up
+connectors; this is application-dependent.  However, the above example
+implicitly implies that a connection is legal only when the germ-atom
+of one section is the same as a connector-atom in another section.
+Likewise, the edge-labels should match up or be coherent in some way.
+
+The `ConnectorSeq` link is an ordered link, rather than an unordered
+set.  This is because in many applications, the sequential order of the
+connectors matter.
+
+Germs and Etales
+----------------
+In the above, the germ `(Atom "foo")` can be taken to be a label "foo"
+on the vertex that is the germ of the section.  There is no requirement
+that this label be unique, or that it uniquely identify a vertex.  Thus,
+in general, there will be many different sections having the same germ.
+
+In this case, it is common to visualize sections as pieces of paper,
+stacked one on top another, aligned so that the germs are always above
+one-another. This stacking is referred to as a "stalk". Alternately, the
+stalk can be visualized as a fir-tree or pine-tree, where annual growths
+define the trunk, and then branches shoot off to the side, on level
+planes or "etales". A single section is then just that etale, that plane
+of branches from that single year of growth.  Unlike a pine-tree, however,
+sections, like jigsaw-puzzle pieces, can be assembled together to make
+a bigger section. Such sub-assemblies are still "etales", in that they
+are all at the same level.
+
+Sheaf Theory
+------------
+The collection of all possible stalks, and the sections on them,
+together with the rules that dictate how the connectors can connect
+is terms a "sheaf".
+
+The axioms of sheaf theory can be understood as saying that the
+puzzle-pieces can only be assembled in certain legal ways, and that
+sub-assemblies can be intersected with one-another, as long as they
+are correctly lined up.  The Wikipedia page for Sheaf Theory bears
+very little resemblance to the description above, even though they are
+both taking about the same concepts.  That is because the typical
+application of Sheaf Theory in mathematics deals with sections that
+have an infinite number (countable and uncountable) of connectors, and
+the connector labels form a ring or a field.  That is not the case here,
+and so the situation is conceptually simpler, here.
+
+In relation to Graph Theory
+---------------------------
+Note that the above started by talking about graphs, but ends at a
+somewhat different place.  It is worth reviewing the differences.
+In the canonical description of a graph, it is implicitly assumed,
+without statement, that each vertex is unique and unambiguous and
+obviously a different vertex than any of the others. Likewise for
+edges: they join pairs of vertexes, and there is no confusion about
+what is being connected.
+
+This is not the case for sheaves: although a germ can be visualized as
+a single vertex, the fact that there is a stalk above the germ implies
+that many vertexes in the graph are taken to be "the same vertex". Yet,
+despite being the "same vertex", each section connects to the graph in
+different ways.  Thus, a sheaf can be visualized as a graph with a
+certain quotient operation applied, a lumping together of certain
+vertexes into a common set, the "germ".
+
+In graph theory, an edge unambiguously connects two vertexes. By
+contrast, the connectors on a section are a bit more ambiguous: they can
+connect to anything else that is legally connectable: the connectors
+must match, must be contractible.  The connectibility of connectors
+are given by rules, but those rules are "user-defined" (although they
+usually match connectors to germs and force edge-label agreement).
+
+In relation to Tensor Algebra
+-----------------------------
+A tensor can also be visualized as a kind-of spider or puzzle-piece: the
+legs or tabs are just the indexes on the tensor, and the number of legs
+is the degree of the tensor.  The act of contracting tensor indexes is
+the same as connecting together connectors.
+
+More properly, a tensor is a linear combination of such puzzle-pieces;
+it is a linear combination of the etales of the stalk.  Thus, for
+example, an N-dimensional vector in an N-dimensional space can be
+visualized as a linear sum of N different connectors (that is, as a sum
+of one-legged spiders). Each basis element of the vector space
+corresponds to a single connector. When one takes a dot-product of
+two vectors, one joins connector-to-connector, aligning the basis
+elements of the vector, and sums up the values.
+
+Thus, if one has a list of connectors, and a floating-point value
+attached to each, this can be visualized as a vector. Examples arise
+in linguistics, where one has lists of words, and the associated counts:
+these form a vector.
+
+In the more general case, a tensor of degree K is a linear sum of spiders
+or puzzle-pieces with K legs/connectors on them.  A tensor is a "stalk"
+with a number attached to each "etale" or section.  Tensors can be
+contracted together to form other tensors simply by connecting some of
+the legs/connectors.  Multiplication and co-multiplication in a tensor
+algebra are just specific rules for connecting connectors so that
+linearity is preserved.
+
+The N-gram in linguistics an example of an degree-N tensor. The count of
+the number of occurrences that an N-gram is seen is the weight.
+Sometimes the collection of N-grams is called a "vector", but this is
+not quite right, because when multiple N-grams are assembled to form a
+sentence, the words must match-up correctly: N-grams are tensor
+elements.
+
+In relation to Pregroup Grammars and Category Theory
+----------------------------------------------------
+The contraction rules for the connectors imply that they form a kind of
+pre-group grammar (see the Wikipedia article).  Such grammars are
+examples of non-symmetric monoidal categories.
+
+This viewpoint is rather complex, and is not elaborated here. However,
+it is useful: it provides insight into the nature of parsing, and
+explains the correspondence (Curry-Howard correspondence) between
+categories and internal languages. That is, languages are parsed, and
+the act of parsing is the discovery of those sections that have legal
+joinings of connectors.
+
+References:
+* John Baez, [Physics, Topology, Logic and Computation: A Rosetta Stone](http://math.ucr.edu/home/baez/rosetta.pdf)
+* Multiple publications from Bob Coecke.
+* Jean-Yves Girard, "Locus Solum"
+
+In relation to Link Grammar
+---------------------------
+The definition and use of sections and connectors here is directly
+inspired by the theory of Link Grammar.  The intent of the machinery
+here is to provide a generalized version of Link Grammar suitable for
+the discovery and analysis of generalized networks of relationships
+between concepts and events taken from observations of the external
+world.
+
+In link-grammar, "germs" are called "lexical items". The "connector
+sequences" are called "disjuncts". The "stalk" is a lexical entry or
+dictionary entry. The fact that the disjuncts are disjoined is a way of
+saying that each etale (section) of a germ is distinct.
+
+Terminology
+===========
+Some recurring terms are used in the code, and are defined here:
+
+* "germ"      -- This is the spider-body: the vertex at the center.
+* "section"   -- This is a single spider (jigsaw-piece), having a single
+                 germ at it's center. (Note: this is in conflict with
+                 common mathematical terminology, where a section consists
+                 of one or more connected spiders/jigsaw-pieces).
+* "connector" -- As described above; an edge attached to a germ.
+* "stalk"     -- This is the collection of all sections that have the
+                 same germ. The intent is that a stalk can be pictured
+                 as the main stem or stalk of a plant. The connectors
+                 are then like branches on a fir-tree (i.e. are all at
+                 the same level or section).
+
+
+Network Inference and Analysis Tools
+====================================
+In this project, there's a generic theme of inferring structure from
+a sequence of events.  That is, a sequence of events is observed in the
+external world, and the question arises: are these events correlated?
+Do they mean something when observed together, or is it happenstance?
+What is the relationship between the items in the sequence of events?
+
+The presumption made here is that the sequence of observed events are
+being generated by multiple different actors, who are performing actions
+independently of one-another, and sometimes exchanging messages with
+one-another, along a network.  In the simplest case, the observed events
+are the sequence of actions performed by each of the actors, placed in
+some time-like sequential order.  The goal of the code in this directory
+is to statistically infer the structure of the network, given a sequence
+of observed events.
+
+Theoretical computer science has explored a number of theories for
+describing the relationships between ordered events, and their
+interpretation as a network; these theories are inter-related, and
+go under the name of:
+
+ * Sequent Calculus (proof theory)
+ * Process Calculus
+ * Calculus of Communicating Systems (CCS)
+ * The theory of Communicating Sequential Processes (CSP)
+ * History monoids, trace monoids and Trace theory
+ * Actor model
+ * Dependency grammar
+ * Sheaf theory
+
+See the respective Wikipedia articles on each of these topics. A
+lightning review of these concepts is given below.
+
+
+Networks and Sheaf theory
+-------------------------
+The topological structure of a graph can be understood locally in terms
+of "sheaf theory". In this framework, instead of looking at a graph as
+whole, one instead looks at it locally, in terms of how any given vertex
+attaches to the other vertexes around it.
+
+Thus, isolating a single vertex in the graph, one can see that it has N
+different edges attaching it to other vertexes in the graph: one says
+that the degree of the vertex is N.  The "section" of the vertex is the
+list of the N edges that are attached to it.  The graph, as a whole,
+is then described by listing each vertex in it, and the section
+associated with it.
+
+This should be contrasted to the traditional, canonical description of
+a graph, as a list all of the vertexes and all of the edges. The problem
+with the canonical description is that the local connectivity of the
+graph is hidden: one has to traverse the entire list of edges to find
+those that are connected to a particular vertex. This is inconvenient
+and inefficient.
+
+Thus, a typical section might look like this:
+```
+    Section
+        LexicalAtom "something"
+        ConnectorSeq
+            Connector
+                LexicalAtom "it's"
+                ConnectorDir "-"
+            Connector
+                LexicalAtom "curious"
+                ConnectorDir "+"
+```
+
+The above encodes the idea that the vertex "something" has an edge that
+connects it to the vertex "it's", and another edge that connects it to
+the vertex "curious".
+
+The `Section`, `ConnectorSeq`, `Connector` and `ConnectorDir` are real
+atom types.  The `LexicalAtom` is not: its just an example. The word
+"lexical" is used here to suggest that the above has the form of a
+dictionary entry: one can look up "something" in the dictionary, and,
+obtain as it's definition, the `ConnectorSeq` of everything it attaches
+to.
+
+The `ConnectorDir` will be explained later. In general, one may want to
+include additional information about a connector: a weight, a distance,
+its commutativity properties, etc.
+
+
+Stalks, Germs, Lexical Items
+----------------------------
+A base presumption here is that a given vertex participates not in just
+one network graph, but in millions of them. A single network can then be
+viewed as a single global section of sheaf; it is the abstract collection
+of all of the networks that comprises the sheaf.
+
+By making a large number of statistical observations of graphs, and
+then collecting statistics on sections, one can hope to discern how a
+vertex typically connects into a typical graph. In sheaf theory, this
+information about the typical behavior of a vertex is called the "stalk"
+of the vertex, the vertex being the "germ" from which the stalk grows.
+
+The "gluing axioms" of a sheaf can be thought as describing how different
+connectors can be joined together.  The act of parsing requires selecting
+a single disjunct out of the disjoint union of all of them; thus, the
+disjoint union is a set of 'possibilities' or parts of a 'possible
+world', and so can be understood in terms of Kripke-Joyal semantics.
+
+
+Grammar
+-------
+In linguistics and in computer science, the stalk/germ can be viewed as
+a grammatical entry in a grammar.  A grammar describes how a "word" in
+a "language" can be related to other words in the language.
+
+In the theory of language, one is presented with a linear sequence of
+words, a "sentence".  There are two primary styles for expressing
+grammars: production grammars and dependency grammars. Production
+grammars ("constituency grammars", "head-phrase structure grammars"
+(HPSG) and so on) are expressed in terms of re-write or production rules.
+These kinds of grammars are often classified according to the Chomsky
+hierarchy: regular grammars that describe regular expressions (finite
+state machines), context-free grammars that describe push-down automata,
+etc.
+
+A dependency grammar describes links or dependencies between the words
+in a sentence. The prototypical dependency grammar is that of Tesnière.
+Link Grammar is an example of a dependency grammar.  Note that, for
+every production grammar, there is an equivalent dependency grammar,
+and vice versa.  The lexis of a dependency grammar can be written as a
+collection of sections; this is made very explicit in Link Grammar.
+
+A language is then the same thing as the "étalé space" of a sheaf.
+
+
+Trace theory
+------------
+In a language, sentences are linear sequences of words. The constraint
+of linear. ordered sequences is loosened in trace theory, CSP and CCS.
+Those theories describe "partially-commutative monoids", where the
+concept of a sentence is replaced by the concept of a "trace". A trace
+is a sequence, where the order of some of the items in the sequence is
+not important.
+
+An example from natural language might be:
+```
+   "This (maybe, is) an example."
+```
+which encodes the idea that the two sentences: "This maybe is an
+example." is "This is maybe an example." have more or less the same
+meaning, and that the word-order for `(maybe, is)` essentially did not
+matter.
+
+Relative order dependence/independence typically occurs in any situation
+where there are instructions for performing actions.  Thus, "place
+flour, salt and water in a bowl" does not specify what order these
+ingredients are placed in the bowl; what does matter is that this is
+performed before placing the mixture in the oven.  In computer science,
+this describes the notion of parallel processing: some computations can
+be done in parallel, as long as they are all completed before some other
+computation is performed.  Serialization ("rendezvous") primitives are
+mutexes and semaphores.
+
+In trace theory, one has the general idea that one is observing traces
+as the result of computations being performed by distinct agents or
+actors exchanging messages between one-another; the ordering of some
+messages does not matter; the order of others do.  The sequence of
+observed messages is the "trace".
+
+
+Trace and History Monoids
+-------------------------
+The example
+```
+   "This (maybe, is) an example."
+```
+is an example of a "trace monoid" (see Wikipedia).  For every trace
+monoid, there is an equivalent (isomorphic) "history monoid". For this
+example, it is
+```
+  [This, This] [maybe, .] [., is] [an, an] [example, example]
+```
+This makes clear that the network consists of two actors, both of
+which move to the state "This", initially. Then one actor moves to
+the state "maybe", while the other simultaneously moves to the state
+"is". Both then move to the state "an", followed by "example".  The two
+actors presumably exchange messages to accomplish this synchronization;
+those messages are not visible in the trace; only the sequence of states
+are.
+
+
+Cause and effect
+----------------
+Whenever a sequence of events is observed for a system, the apparent
+order of "cause" and "effect" can be reversed, with the apparent "cause"
+coming long after the "effect".
+
+For example: to build a high-rise building, a foundation must be dug
+first.  Observed as events in time, the construction comes after the
+foundation is built. However, it would be incorrect to say that a hole
+in the ground "causes" a sky-scraper to appear, even though it came
+earlier.  This is because the formal cause of the skyscraper is the
+will of a real-estate developer; yet, this will is not observed; only
+the construction events are.  From the point of view of a dependency
+grammar describing the sequence of events, the skyscraper should be
+viewed as the "head", and the hole in the ground as the "dependent",
+with the head dominating the dependent, or "causing" the dependent,
+even though the dependent comes earlier.
+
+This example demonstrates why Hidden Markov Model (HMM) and Bayesian
+network models of human language fail: The earlier words in a sentence
+do not, cannot "cause" later words to appear; rather, it is often the
+case that the later words "cause" or "force" the earlier words to appear.
+
+More generally, this example shows why a dependency grammar approach,
+with events associated with "sites", "germs", "stalks", "lexical
+entries" is more appropriate for the analysis of a network, and is more
+powerful, than HMM, Bayesian networks or Latent Semantic Analysis (LSA)
+can be.
+
+Random jab: this is also why Hutter's naive AIXI is incorrect: it only
+considers past events, thus incorrectly inferring in a forward time-like
+direction.  Clearly, this leads to incorrect conclusions about
+skyscrapers, and fails to induce the Aristotelian "formal cause" of
+events.
+
+
+Inferring Grammar
+----------------
+To observationally infer the grammar of a network, one must observe a
+lot of networks. With each network observation, one may create a set
+of sections summarizing that network.  To get a view of the general
+network, counts can be maintained for each observed section.  The result
+of such counting is a frequency distribution over sections. To induce a
+grammar, one may then compare the distributions on different vertexes;
+if they are sufficiently similar, the vertexes can be grouped together
+into a class. Since vertexes also occur as the end-points of connectors,
+a grouping also has to be observed there.
+
+If the network is not apparent (if it is latent or hidden), then one
+cannot directly generate sections, because one cannot directly observe
+the edges. In this case, a more round-about route is required, as
+follows:
+
+1) Assume all possible networks occur with equal probability.
+2) Observe a lot of sequences, and count the frequency with which edges
+   occur.
+3) Compute the mutual information (MI) for each edge. That is, each edge
+   has two endpoints, and the co-occurrence of these endpoints can be
+   captured as the mutual information between them.  The MI serves as
+   a kind of measure of covariance or correlation.
+4) Re-observe a lot of sequences, this time over-laying them with a
+   maximal spanning tree (MST). So unlike step 1, where each network was
+   assumed to be a clique, this time, the network is assumed to be a
+   tree.  The "correct" tree is the tree that maximizes the sum of the
+   MI of the edges.
+5) Compute the sections of the MST, and accumulate these to obtain a
+   distribution of sections.
+
+The grammar can then be inferred from the distribution of the sections.
+
+
+MST parsing
+-----------
+The primary tool in this directory is an MST parser. Given a specific
+sequence of events, viz a sequence of atoms, all of the same type, and
+given a large pool of observed dependencies between pairs of events, the
+MST parser will construct a dependency tree such that the score of the
+edges of the dependency tree are maximized.
+
+Typical pair-wise relationships might be indicated as follows, in the
+atomspace:
+```
+    EvaluationLink   (MI=24.3189)
+        PredicateNode "word-pair"
+        ListLink
+            WordNode "foo"
+            WordNode "bar"
+```
+which indicates that the word-pair (foo,bar) was observed with a mutual
+information (MI) of 24.3189.
+
+The atomspace can hold sparse matrix of such pair-wise data; in a
+certain sense, the atomspace was designed from the get-go to do exactly
+that.
+
+The MST parse just creates a tree connecting all of the atoms in a
+sequence, such that the sum-total (addition) of the scores of all the
+edges in the tree is maximal, as compared to any other tree.
+
+After the MST parse, the section for each vertex in the parse can be
+computed.

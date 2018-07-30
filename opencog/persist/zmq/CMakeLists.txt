@@ -1,0 +1,5 @@
+IF (HAVE_ZMQ)
+
+ADD_SUBDIRECTORY (atomspace)
+
+ENDIF (HAVE_ZMQ)
