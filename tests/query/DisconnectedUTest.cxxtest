@@ -1,0 +1,205 @@
+/*
+ * tests/query/DisconnectedUTest.cxxtest
+ *
+ * Copyright (C) 2009,2014 Linas Vepstas <linasvepstas@gmail.com>
+ * All Rights Reserved
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License v3 as
+ * published by the Free Software Foundation and including the exceptions
+ * at http://opencog.org/wiki/Licenses
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program; if not, write to:
+ * Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+
+#include <opencog/atoms/base/Link.h>
+#include <opencog/atoms/base/Node.h>
+#include <opencog/atomspace/AtomSpace.h>
+#include <opencog/guile/SchemeEval.h>
+#include <opencog/query/BindLinkAPI.h>
+#include <opencog/util/Logger.h>
+
+#include "test-types.h"
+
+using namespace opencog;
+
+class DisconnectedUTest :  public CxxTest::TestSuite
+{
+	private:
+		AtomSpace *as;
+		SchemeEval* eval;
+
+	public:
+
+		DisconnectedUTest(void)
+		{
+			logger().set_level(Logger::DEBUG);
+			logger().set_print_to_stdout_flag(true);
+#include "test-types.cc"
+		}
+
+		~DisconnectedUTest()
+		{
+			// Erase the log file if no assertions failed.
+			if (!CxxTest::TestTracker::tracker().suiteFailed())
+				std::remove(logger().get_filename().c_str());
+		}
+
+		void setUp(void);
+		void tearDown(void);
+
+		void test_components(void);
+		void test_variables(void);
+		void test_cvariables(void);
+};
+
+/*
+ * This function sets up an implication link, and some data.
+ */
+#define an as->add_node
+#define al as->add_link
+void DisconnectedUTest::setUp(void)
+{
+	as = new AtomSpace();
+	eval = new SchemeEval(as);
+
+	eval->eval("(add-to-load-path \"" PROJECT_SOURCE_DIR "\")");
+
+	eval->eval("(load-from-path \"tests/query/test_types.scm\")");
+}
+
+void DisconnectedUTest::tearDown(void)
+{
+	delete as;
+}
+
+/*
+ * Test bindlink consisting of two disconnected componentns
+ */
+#define getlink(hand,pos) as->getOutgoing(hand,pos)
+#define getarity(hand) as->getArity(hand)
+
+void DisconnectedUTest::test_components(void)
+{
+	logger().debug("BEGIN TEST: %s", __FUNCTION__);
+
+	eval->eval("(load-from-path \"tests/query/disconnected.scm\")");
+
+	Handle bindlinkh = eval->apply("get-bindlink", Handle::UNDEFINED);
+	// Make sure the scheme file actually loaded!
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != bindlinkh);
+
+	// We expect to catch an error here.
+	bool caught = false;
+	try
+	{
+		bindlink(as, bindlinkh);
+	}
+	catch (const InvalidParamException& ex)
+	{
+		logger().debug("Caught exception, just as expected: %s", ex.get_message());
+		caught = true;
+	}
+	logger().info("Caught exception? %d\n", caught);
+
+	// Disable the test, for now. There are legitimate uses of
+	// disconnected queries. Yes, naive users will shoot themselves
+	// in the foot because of this, but wise users need this.
+	// TSM_ASSERT("Failed to catch expected exception", caught);
+
+	logger().debug("END TEST: %s", __FUNCTION__);
+}
+
+/*
+ * Test several patterns carrying ill-formed variable declarations
+ */
+void DisconnectedUTest::test_variables(void)
+{
+	logger().debug("BEGIN TEST: %s", __FUNCTION__);
+
+	eval->eval("(load-from-path \"tests/query/disco-vars.scm\")");
+
+#if DO_NOT_TEST_THIS_IS_NOW_LEGAL
+	// We expect to catch an error here. ------------------------------
+	bool caught = false;
+	try
+	{
+		eval->eval_h("(B)");
+	}
+	catch (const RuntimeException& ex)
+	{
+		logger().debug("Caught exception, just as expected: %s", ex.get_message());
+		caught = true;
+	}
+	logger().info("Caught exception? %d\n", caught);
+	TSM_ASSERT("Failed to catch expected exception", caught);
+#endif
+
+	// We expect to catch an error here. ------------------------------
+	bool caught = false;
+	try
+	{
+		eval->eval_h("(Ba)");
+	}
+	catch (const RuntimeException& ex)
+	{
+		logger().debug("Caught exception, just as expected: %s", ex.get_message());
+		caught = true;
+	}
+	logger().info("Caught exception? %d\n", caught);
+	TSM_ASSERT("Failed to catch expected exception", caught);
+
+	// We expect to catch an error here. ------------------------------
+	caught = false;
+	try
+	{
+		eval->eval_h("(Bu)");
+	}
+	catch (const RuntimeException& ex)
+	{
+		logger().debug("Caught exception, just as expected: %s", ex.get_message());
+		caught = true;
+	}
+	logger().info("Caught exception? %d\n", caught);
+	TSM_ASSERT("Failed to catch expected exception", caught);
+
+	logger().debug("END TEST: %s", __FUNCTION__);
+}
+
+// Similar to above, except that the stuff is build up in C++ not in
+// scheme.  See bug #172.
+void DisconnectedUTest::test_cvariables(void)
+{
+	logger().debug("BEGIN TEST: %s", __FUNCTION__);
+
+	// We expect to catch an error here.
+	bool caught = false;
+	try
+	{
+		Handle va(createNode(VARIABLE_NODE, "$A"));
+		Handle vb(createNode(VARIABLE_NODE, "$B"));
+		Handle blv(createLink(VARIABLE_LIST, va, vb));
+		Handle blb(createLink(AND_LINK, va));
+		Handle blt(createLink(LIST_LINK, va));
+		HandleSeq bll = {blv, blb, blt};
+		Handle bl_final(createLink(bll, BIND_LINK));
+		as->add_atom(bl_final);
+	}
+	catch (const InvalidParamException& ex)
+	{
+		logger().debug("Caught exception, just as expected: %s", ex.get_message());
+		caught = true;
+	}
+	logger().info("Caught exception? %d\n", caught);
+	TSM_ASSERT("Failed to catch expected exception", caught);
+
+	logger().debug("END TEST: %s", __FUNCTION__);
+}

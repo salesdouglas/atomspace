@@ -1,0 +1,231 @@
+/*
+ * tests/query/UnorderedUTest.cxxtest
+ *
+ * Copyright (C) 2009, 2011, 2014 Linas Vepstas <linasvepstas@gmail.com>
+ * All Rights Reserved
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License v3 as
+ * published by the Free Software Foundation and including the exceptions
+ * at http://opencog.org/wiki/Licenses
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program; if not, write to:
+ * Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+
+#include <opencog/guile/SchemeEval.h>
+#include <opencog/guile/SchemeSmob.h>
+#include <opencog/query/BindLinkAPI.h>
+#include <opencog/util/Logger.h>
+
+#include "test-types.h"
+
+using namespace opencog;
+
+class UnorderedUTest :  public CxxTest::TestSuite
+{
+	private:
+		AtomSpace *as;
+		Handle pair;
+		Handle disorder;
+		Handle disordered;
+		Handle disor_more;
+		Handle exhaust;
+		Handle exhaust2;
+		Handle exhaust3;
+		Handle exhaust4;
+		Handle exhaust5;
+		Handle exhaust_eq_12;
+		Handle exhaust_eq_6;
+
+	public:
+
+		UnorderedUTest(void)
+		{
+			logger().set_level(Logger::DEBUG);
+			logger().set_print_to_stdout_flag(true);
+			logger().set_timestamp_flag(false);
+#include "test-types.cc"
+		}
+
+		~UnorderedUTest()
+		{
+			// erase the log file if no assertions failed
+			if (!CxxTest::TestTracker::tracker().suiteFailed())
+				std::remove(logger().get_filename().c_str());
+		}
+
+		void setUp(void);
+
+		void tearDown(void) { }
+
+		void test_un1(void);
+		void test_un2(void);
+		void test_exhaust(void);
+};
+
+/*
+ * This function sets up an implication link, and some data.
+ */
+#define an as->add_node
+#define al as->add_link
+void UnorderedUTest::setUp(void)
+{
+	as = new AtomSpace();
+	SchemeEval* eval = new SchemeEval(as);
+	eval->eval("(add-to-load-path \"" PROJECT_SOURCE_DIR "\")");
+
+	eval->eval("(load-from-path \"tests/query/test_types.scm\")");
+	eval->eval("(load-from-path \"tests/query/unordered.scm\")");
+	eval->eval("(load-from-path \"tests/query/unordered-more.scm\")");
+	eval->eval("(load-from-path \"tests/query/unordered-exhaust.scm\")");
+
+	// Create an implication link that will be tested.
+	pair = eval->apply("pair", Handle::UNDEFINED);
+	disorder = eval->apply("blink", Handle::UNDEFINED);
+	disordered = eval->apply("blinker", Handle::UNDEFINED);
+	disor_more = eval->apply("blank", Handle::UNDEFINED);
+	exhaust = eval->apply("exhaust", Handle::UNDEFINED);
+	exhaust2 = eval->apply("exhaust-2", Handle::UNDEFINED);
+	exhaust3 = eval->apply("exhaust-3", Handle::UNDEFINED);
+	exhaust4 = eval->apply("exhaust-4", Handle::UNDEFINED);
+	exhaust5 = eval->apply("exhaust-5", Handle::UNDEFINED);
+	exhaust_eq_12 = eval->apply("exhaust-eq-12", Handle::UNDEFINED);
+	exhaust_eq_6 = eval->apply("exhaust-eq-6", Handle::UNDEFINED);
+	delete eval;
+}
+
+/*
+ * Test of pattern matching on unordered links. This turns out to be
+ * rather stressful on the pattern matcher, as it requires a bit of a
+ * combinatoric explosion of the search space, under certain circumstances.
+ * The trick is, of course, not to search too much, and not to search too
+ * little.
+ */
+#define getlink(hand,pos) hand->getOutgoingAtom(pos)
+#define getarity(hand) hand->get_arity()
+
+void UnorderedUTest::test_un1(void)
+{
+	logger().debug("BEGIN TEST: %s", __FUNCTION__);
+
+	// Make sure the scheme file actually loaded!
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != pair);
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != disorder);
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != disordered);
+
+	// Result should be a ListLink w/ two solutions
+	Handle result = bindlink(as, pair);
+
+	logger().debug("pair result is %s\n", SchemeSmob::to_string(result).c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 2, getarity(result));
+
+	// Result should be a ListLink w/ one solution. Well, actually, two
+	// solutions.  One should bind the NumberNode, Goournded schema node,
+	// the other should bind to VariableNodes appearing elsewhere in the
+	// atomspace.  We could avoid this by using TypedVariableLinks, but this
+	// potentially confused the test case even more ... so we don't
+	result = bindlink(as, disorder);
+	logger().debug() << "Disorder Result is this:\n" << result->to_string();
+
+	logger().debug("first result is %s\n", SchemeSmob::to_string(result).c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 2, getarity(result));
+
+	// Result should be a ListLink w/ one solution. Well, actually, two as above.
+	result = bindlink(as, disordered);
+	logger().debug() << "DisorderED Result is this:\n" << result->to_string();
+
+	logger().debug("next result is %s\n", SchemeSmob::to_string(result).c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 2, getarity(result));
+
+	logger().debug("END TEST: %s", __FUNCTION__);
+}
+
+void UnorderedUTest::test_un2(void)
+{
+	logger().debug("BEGIN TEST: %s", __FUNCTION__);
+
+	// Make sure the scheme file actually loaded!
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != disor_more);
+
+	// Result should be a ListLink w/ one solution
+	Handle result = bindlink(as, disor_more);
+
+	logger().debug("second result is %s\n", SchemeSmob::to_string(result).c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 1, getarity(result));
+
+	logger().debug("END TEST: %s", __FUNCTION__);
+}
+
+void UnorderedUTest::test_exhaust(void)
+{
+	logger().debug("BEGIN TEST: %s", __FUNCTION__);
+
+	// Make sure the scheme file actually loaded!
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != exhaust);
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != exhaust2);
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != exhaust3);
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != exhaust4);
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != exhaust5);
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != exhaust_eq_12);
+	TSM_ASSERT("Failed to load test data", Handle::UNDEFINED != exhaust_eq_6);
+
+	// --------------------
+	// Result should be a ListLink w/ 60 solutions.
+	Handle result = bindlink(as, exhaust);
+
+	logger().debug("exhaustive result is %s\n", SchemeSmob::to_string(result).c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 60, getarity(result));
+
+	// --------------------
+	// Result should be a ListLink w/ 72 solutions
+	result = bindlink(as, exhaust2);
+
+	logger().debug("exhaust-2 result is %s\n", SchemeSmob::to_string(result).c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 72, getarity(result));
+
+	// --------------------
+	// Result should be a ListLink w/ 12 solutions
+	result = bindlink(as, exhaust3);
+
+	logger().debug("exhaust-3 result is %s\n", SchemeSmob::to_string(result).c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 12, getarity(result));
+
+	// --------------------
+	// Result should be a ListLink w/ 6 solutions
+	result = bindlink(as, exhaust4);
+
+	logger().debug("exhaust-4 result is %s\n", SchemeSmob::to_string(result).c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 6, getarity(result));
+
+	// --------------------
+	// Result should be a ListLink w/ 6 solutions
+	result = bindlink(as, exhaust5);
+
+	logger().debug("exhaust-5 result is %s\n", SchemeSmob::to_string(result).c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 6, getarity(result));
+
+	// --------------------
+	// Result should be a ListLink w/ 12 solutions
+	result = bindlink(as, exhaust_eq_12);
+
+	logger().debug("exhaust-eq-12 result is %s\n", SchemeSmob::to_string(result).c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 12, getarity(result));
+
+	// --------------------
+	// Result should be a ListLink w/ 6 solutions
+	result = bindlink(as, exhaust_eq_6);
+
+	logger().debug("exhaust-eq-6 result is %s\n", SchemeSmob::to_string(result).c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 6, getarity(result));
+
+	logger().debug("END TEST: %s", __FUNCTION__);
+}
+

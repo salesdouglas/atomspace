@@ -1,0 +1,106 @@
+/*
+ * tests/query/BuggyEqualUTest.cxxtest
+ *
+ * Copyright (C) 2015 Linas Vepstas <linasvepstas@gmail.com>
+ * All Rights Reserved
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License v3 as
+ * published by the Free Software Foundation and including the exceptions
+ * at http://opencog.org/wiki/Licenses
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program; if not, write to:
+ * Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+
+#include <opencog/atomspace/AtomSpace.h>
+#include <opencog/guile/SchemeEval.h>
+#include <opencog/query/BindLinkAPI.h>
+#include <opencog/util/Logger.h>
+
+using namespace opencog;
+
+class BuggyEqual :  public CxxTest::TestSuite
+{
+	private:
+		AtomSpace *as;
+		SchemeEval* eval;
+
+	public:
+
+		BuggyEqual(void)
+		{
+			logger().set_level(Logger::DEBUG);
+			logger().set_print_to_stdout_flag(true);
+
+			as = new AtomSpace();
+			eval = new SchemeEval(as);
+			eval->eval("(use-modules (opencog exec))");
+			eval->eval("(add-to-load-path \"" PROJECT_SOURCE_DIR "\")");
+
+		}
+
+		~BuggyEqual()
+		{
+			delete eval;
+			delete as;
+			// Erase the log file if no assertions failed.
+			if (!CxxTest::TestTracker::tracker().suiteFailed())
+				std::remove(logger().get_filename().c_str());
+int rc = CxxTest::TestTracker::tracker().suiteFailed();
+_exit(rc); // XXX hack to avoid double-free in __run_exit_handlers
+		}
+
+		void setUp(void);
+
+		void tearDown(void) { as->clear(); }
+
+		void test_bugeq(void);
+		void test_bugalt(void);
+};
+
+void BuggyEqual::setUp(void)
+{
+	as->clear();
+}
+
+#define getlink(hand,pos) hand->getOutgoingAtom(pos)
+#define getarity(hand) hand->get_arity()
+
+/*
+ * NotLink causing weird trouble.
+ */
+void BuggyEqual::test_bugeq(void)
+{
+	logger().debug("BEGIN TEST: %s", __FUNCTION__);
+
+	eval->eval("(load-from-path \"tests/query/buggy-equal.scm\")");
+
+	Handle pln = eval->eval_h("(cog-execute! pln-rule-deduction)");
+	printf("Deduction results:\n%s\n", pln->to_short_string().c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 4, getarity(pln));
+
+	logger().debug("END TEST: %s", __FUNCTION__);
+}
+/*
+ * NotLink causing weird trouble.
+ */
+void BuggyEqual::test_bugalt(void)
+{
+	logger().debug("BEGIN TEST: %s", __FUNCTION__);
+
+	eval->eval("(load-from-path \"tests/query/buggy-equal.scm\")");
+
+	Handle alt = eval->eval_h("(cog-execute! pln-alt)");
+	printf("Alt results:\n%s\n", alt->to_short_string().c_str());
+	TSM_ASSERT_EQUALS("wrong number of solutions found", 4, getarity(alt));
+
+	logger().debug("END TEST: %s", __FUNCTION__);
+}
