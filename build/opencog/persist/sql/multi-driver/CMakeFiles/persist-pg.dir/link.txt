@@ -1,0 +1,1 @@
+/usr/bin/c++  -fPIC -Wall -fPIC -Wno-variadic-macros -fopenmp -std=gnu++11 -O3 -g -fstack-protector  -shared -Wl,-soname,libpersist-pg.so -o libpersist-pg.so CMakeFiles/persist-pg.dir/ll-pg-cxx.cc.o -lpthread -lpq -Wl,-rpath,:::::::::::::::::::::::::::::::::::::::::::::::::::::::::: 
